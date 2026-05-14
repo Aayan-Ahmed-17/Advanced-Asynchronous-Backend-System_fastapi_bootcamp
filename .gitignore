@@ -1,0 +1,48 @@
+# --- Python Specific ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.hypothesis/
+.pytest_cache/
+.mypy_cache/
+
+# --- FastAPI/Backend Specific ---
+.env
+.env.*
+!.env.example  # Keep example env files
+*.db
+*.sqlite3
+logs/
+uploads/
+media/
+
+# --- IDE/Editor Specific ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- Build/Deployment ---
+dist/
+build/
+*.egg-info/
+site/
