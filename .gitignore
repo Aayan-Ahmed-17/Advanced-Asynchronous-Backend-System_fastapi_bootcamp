@@ -23,7 +23,7 @@ coverage.xml
 
 # --- FastAPI/Backend Specific ---
 .env
-.env.*
+# .env.*
 !.env.example  # Keep example env files
 *.db
 *.sqlite3
