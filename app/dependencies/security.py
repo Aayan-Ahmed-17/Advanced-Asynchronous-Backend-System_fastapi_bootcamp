@@ -1,7 +1,8 @@
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import jwt, JWTError
+import jwt
+from jwt import PyJWTError as JWTError
 from passlib.context import CryptContext
 from dotenv import load_dotenv
 
