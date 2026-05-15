@@ -16,7 +16,7 @@ user_collection = None
 async def init_db():
     global client, db, user_collection
     client = AsyncMongoClient(MONGO_URI)
-    db = client.advanved_core_auth
+    db = client.advanced_core_auth
     user_collection = db["user"]
 
 async def close_db():
