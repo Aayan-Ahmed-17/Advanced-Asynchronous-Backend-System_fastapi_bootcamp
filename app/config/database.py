@@ -23,3 +23,6 @@ async def close_db():
     global client
     if client:
         await client.close()
+
+def get_user_collection():
+    return user_collection
