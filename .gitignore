@@ -30,6 +30,7 @@ coverage.xml
 logs/
 uploads/
 media/
+requirements/
 
 # --- IDE/Editor Specific ---
 .vscode/
