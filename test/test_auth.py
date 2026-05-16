@@ -8,6 +8,7 @@ Uses module-scoped state dict to share tokens across test functions.
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient
+import uuid
 
 # Module-level state shared across the ordered test steps
 _state: dict = {}
@@ -33,6 +34,12 @@ async def test_step1_register(client: AsyncClient):
 
     data = response.json()
     assert "id" in data
+    # Verify id is a valid UUID v4 string (not a raw MongoDB ObjectId)
+    try:
+        parsed = uuid.UUID(data["id"], version=4)
+        assert str(parsed) == data["id"], "id is not a canonical UUID v4 string"
+    except ValueError:
+        raise AssertionError(f"id '{data['id']}' is not a valid UUID v4")
     assert data["email"] == TEST_EMAIL
     assert data["is_active"] is True
     assert data["is_superuser"] is False

@@ -6,6 +6,7 @@ from app.config.database import get_user_collection
 from app.config.cache import redis_client
 from app.models.user_model import User
 from datetime import datetime, timezone, timedelta
+import uuid
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -18,8 +19,9 @@ async def register(user_in: UserCreate):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create new user
+    # Create new user with a UUID v4 as the public identifier
     new_user_dict = {
+        "uid": str(uuid.uuid4()),       # Public UUID — returned as `id` in responses
         "email": user_in.email,
         "hashed_password": get_password_hash(user_in.password),
         "is_active": True,
@@ -30,9 +32,9 @@ async def register(user_in: UserCreate):
     result = await user_collection.insert_one(new_user_dict)
     new_user_dict["_id"] = str(result.inserted_id)
     
-    # Map to response schema
+    # Return uid as the public `id` field
     return {
-        "id": new_user_dict["_id"],
+        "id": new_user_dict["uid"],
         "email": new_user_dict["email"],
         "is_active": new_user_dict["is_active"],
         "is_superuser": new_user_dict["is_superuser"],
@@ -68,7 +70,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Returns the currently authenticated user's profile."""
     return {
-        "id": str(current_user.id),
+        "id": current_user.uid or str(current_user.id),  # uid preferred; fallback for legacy docs
         "email": current_user.email,
         "is_active": current_user.is_active,
         "is_superuser": current_user.is_superuser,

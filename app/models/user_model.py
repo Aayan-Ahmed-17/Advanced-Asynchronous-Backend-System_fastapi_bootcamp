@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, EmailStr
 
 class User(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
+    uid: Optional[str] = None          # Public UUID — decoupled from MongoDB _id
     email: EmailStr
     hashed_password: str
     is_active: bool = True

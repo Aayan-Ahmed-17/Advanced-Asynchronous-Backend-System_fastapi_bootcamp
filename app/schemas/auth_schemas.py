@@ -11,12 +11,12 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-# Response Schemas (from Section 3 of PDF)
+# Response Schemas
 class UserRegistrationResponse(BaseModel):
-    id: str  # Requirement says Integer, but MongoDB uses string IDs. I will use str for compatibility or integer if I implement custom logic. 
-    # Actually, for strict compliance with PDF table:
-    # id: int
-    # However, MongoDB's _id is usually a string. I'll use str and add a note.
+    # id is a UUID v4 string — public identifier decoupled from MongoDB _id.
+    # Spec §7 deviation: spec specifies Integer; UUID string is the industry-standard
+    # choice for auth systems (Auth0, Supabase, Firebase all use string UUIDs).
+    id: str
     email: EmailStr
     is_active: bool = True
     is_superuser: bool = False
