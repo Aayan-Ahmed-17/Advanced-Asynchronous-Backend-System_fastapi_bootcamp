@@ -6,29 +6,108 @@ on:
   pull_request:
     branches: [ "master", "main" ]
 
+# ── Stage 1: Environment Setup ─────────────────────────────────────────────────
+# Spins up MongoDB and Redis as service containers so tests have live backends.
 jobs:
   verify:
     runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      MONGO_URI: mongodb://localhost:27017
+      REDIS_URL: redis://localhost:6379/0
+      SECRET_KEY_ACCESS: ci-test-access-secret-key-32chars!!
+      SECRET_KEY_REFRESH: ci-test-refresh-secret-key-32chars!
+
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Set up Python
+
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
         python-version: "3.12"
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-    
-    - name: Lint with flake8
+
+    # ── Stage 2: Model Integrity ───────────────────────────────────────────────
+    # Syntax errors + undefined names (flake8) AND static type checking (mypy).
+    - name: Lint with flake8 (syntax & undefined names)
       run: |
         pip install flake8
-        # stop the build if there are Python syntax errors or undefined names
-        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-    
-    - name: Test with pytest
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics \
+          --exclude=venv,.git,__pycache__
+
+    - name: Type-check with mypy (model integrity)
       run: |
-        # Run tests (will be expanded as unit tests are added)
-        pytest --version
+        pip install mypy
+        mypy app --ignore-missing-imports --no-error-summary
+
+    # ── Stage 3: Unit & Security Audit ────────────────────────────────────────
+    # Runs the full test suite — all 6 end-to-end auth scenarios.
+    - name: Run pytest (unit & security audit)
+      run: |
+        pytest test/ -v --tb=short
+
+    # ── Stage 4: Deployment Verification ──────────────────────────────────────
+    # Full integration smoke-test: register → login → refresh → logout → blacklist check.
+    # Runs the app in the background and exercises real HTTP endpoints.
+    - name: Integration smoke-test (deployment verification)
+      run: |
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+        sleep 4
+
+        # Register
+        REG=$(curl -sf -X POST http://localhost:8000/auth/register \
+          -H "Content-Type: application/json" \
+          -d '{"email":"smoke@test.io","password":"SmokePass123!"}')
+        echo "REGISTER: $REG"
+
+        # Login
+        LOGIN=$(curl -sf -X POST http://localhost:8000/auth/login \
+          -H "Content-Type: application/json" \
+          -d '{"email":"smoke@test.io","password":"SmokePass123!"}')
+        echo "LOGIN: $LOGIN"
+
+        ACCESS=$(echo $LOGIN | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+        REFRESH=$(echo $LOGIN | python3 -c "import sys,json; print(json.load(sys.stdin)['refresh_token'])")
+
+        # Refresh
+        ROTATED=$(curl -sf -X POST http://localhost:8000/auth/refresh \
+          -H "Content-Type: application/json" \
+          -d "{\"refresh_token\":\"$REFRESH\"}")
+        echo "REFRESH: $ROTATED"
+        NEW_ACCESS=$(echo $ROTATED | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
+
+        # Logout
+        LOGOUT=$(curl -sf -X POST http://localhost:8000/auth/logout \
+          -H "Authorization: Bearer $NEW_ACCESS")
+        echo "LOGOUT: $LOGOUT"
+
+        # Zero-trust check: revoked token must return 401
+        STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+          -H "Authorization: Bearer $NEW_ACCESS" \
+          http://localhost:8000/auth/me)
+        echo "Blacklist check HTTP status: $STATUS"
+        if [ "$STATUS" != "401" ]; then
+          echo "ERROR: Revoked token was NOT rejected (got $STATUS, expected 401)"
+          exit 1
+        fi
+        echo "Deployment verification PASSED."
