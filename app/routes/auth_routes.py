@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.auth_schemas import UserCreate, UserLogin, UserRegistrationResponse, TokenExchangeResponse, GenericActionResponse, RefreshTokenRequest
-from app.dependencies.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, SECRET_KEY_REFRESH
+from app.dependencies.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, SECRET_KEY_REFRESH, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.dependencies.auth import get_current_user, oauth2_scheme
-from app.config.database import get_user_collection
-from app.config.cache import redis_client
+from app.config.database import get_user_collection, get_next_sequence_value
+from app.config import cache
 from app.models.user_model import User
 from datetime import datetime, timezone, timedelta
-import uuid
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -19,9 +18,12 @@ async def register(user_in: UserCreate):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create new user with a UUID v4 as the public identifier
+    # Generate a sequential integer ID
+    user_id = await get_next_sequence_value("user_id")
+    
+    # Create new user
     new_user_dict = {
-        "uid": str(uuid.uuid4()),       # Public UUID — returned as `id` in responses
+        "_id": user_id,
         "email": user_in.email,
         "hashed_password": get_password_hash(user_in.password),
         "is_active": True,
@@ -29,12 +31,11 @@ async def register(user_in: UserCreate):
         "created_at": datetime.now(timezone.utc)
     }
     
-    result = await user_collection.insert_one(new_user_dict)
-    new_user_dict["_id"] = str(result.inserted_id)
+    await user_collection.insert_one(new_user_dict)
     
-    # Return uid as the public `id` field
+    # Map to response schema
     return {
-        "id": new_user_dict["uid"],
+        "id": new_user_dict["_id"],
         "email": new_user_dict["email"],
         "is_active": new_user_dict["is_active"],
         "is_superuser": new_user_dict["is_superuser"],
@@ -60,9 +61,9 @@ async def login(credentials: UserLogin):
 
 @router.post("/logout", response_model=GenericActionResponse)
 async def logout(token: str = Depends(oauth2_scheme)):
-    if redis_client:
+    if cache.redis_client:
         # Blacklist the current access token for its remaining life (approx 15 mins)
-        await redis_client.setex(f"blacklist:{token}", timedelta(minutes=15), "revoked")
+        await cache.redis_client.setex(f"blacklist:{token}", timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES), "revoked")
     
     return {"message": "Successfully logged out"}
 
@@ -70,7 +71,7 @@ async def logout(token: str = Depends(oauth2_scheme)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Returns the currently authenticated user's profile."""
     return {
-        "id": current_user.uid or str(current_user.id),  # uid preferred; fallback for legacy docs
+        "id": current_user.id,
         "email": current_user.email,
         "is_active": current_user.is_active,
         "is_superuser": current_user.is_superuser,

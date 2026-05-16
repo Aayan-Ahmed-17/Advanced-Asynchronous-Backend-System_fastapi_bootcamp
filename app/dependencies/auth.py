@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.dependencies.security import decode_token, SECRET_KEY_ACCESS
 from app.config.database import get_user_collection
-from app.config.cache import redis_client
+from app.config import cache
 from app.models.user_model import User
 from typing import Optional
 
@@ -16,8 +16,8 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
     )
 
     # 1. Check Redis Blacklist
-    if redis_client:
-        is_blacklisted = await redis_client.get(f"blacklist:{token}")
+    if cache.redis_client:
+        is_blacklisted = await cache.redis_client.get(f"blacklist:{token}")
         if is_blacklisted:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,

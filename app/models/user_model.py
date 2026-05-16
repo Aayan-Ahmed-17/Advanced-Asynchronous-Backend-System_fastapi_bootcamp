@@ -1,15 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 class User(BaseModel):
-    id: Optional[str] = Field(None, alias="_id")
-    uid: Optional[str] = None          # Public UUID — decoupled from MongoDB _id
+    id: Optional[int] = Field(None, alias="_id")
     email: EmailStr
     hashed_password: str
     is_active: bool = True
     is_superuser: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)

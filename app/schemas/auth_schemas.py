@@ -11,12 +11,9 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-# Response Schemas
+# Response Schemas (from Section 3 of PDF)
 class UserRegistrationResponse(BaseModel):
-    # id is a UUID v4 string — public identifier decoupled from MongoDB _id.
-    # Spec §7 deviation: spec specifies Integer; UUID string is the industry-standard
-    # choice for auth systems (Auth0, Supabase, Firebase all use string UUIDs).
-    id: str
+    id: int
     email: EmailStr
     is_active: bool = True
     is_superuser: bool = False

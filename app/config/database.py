@@ -1,5 +1,5 @@
 # pyrefly: ignore [missing-import]
-from pymongo import AsyncMongoClient
+from pymongo import AsyncMongoClient, ReturnDocument
 from dotenv import load_dotenv
 import os
 
@@ -26,3 +26,14 @@ async def close_db():
 
 def get_user_collection():
     return user_collection
+
+async def get_next_sequence_value(sequence_name: str):
+    """Atomic counter for sequential IDs."""
+    global db
+    result = await db.counters.find_one_and_update(
+        {"_id": sequence_name},
+        {"$inc": {"sequence_value": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER
+    )
+    return result["sequence_value"]
