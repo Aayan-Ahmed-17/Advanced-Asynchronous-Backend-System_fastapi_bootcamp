@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.schemas.auth_schemas import UserCreate, UserLogin, UserRegistrationResponse, TokenExchangeResponse, StandardActionResponse
+from app.schemas.auth_schemas import UserCreate, UserLogin, UserRegistrationResponse, TokenExchangeResponse, GenericActionResponse
 from app.dependencies.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, SECRET_KEY_REFRESH
 from app.dependencies.auth import get_current_user, oauth2_scheme
 from app.config.database import get_user_collection
@@ -56,13 +56,13 @@ async def login(credentials: UserLogin):
         "token_type": "bearer"
     }
 
-@router.post("/logout", response_model=StandardActionResponse)
+@router.post("/logout", response_model=GenericActionResponse)
 async def logout(token: str = Depends(oauth2_scheme)):
     if redis_client:
         # Blacklist the current access token for its remaining life (approx 15 mins)
         await redis_client.setex(f"blacklist:{token}", timedelta(minutes=15), "revoked")
     
-    return {"detail": "Successfully logged out"}
+    return {"message": "Successfully logged out"}
 
 @router.post("/refresh", response_model=TokenExchangeResponse)
 async def refresh_token(refresh_token: str):

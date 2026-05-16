@@ -27,5 +27,6 @@ class TokenExchangeResponse(BaseModel):
     refresh_token: str
     token_type: str = "bearer"
 
-class StandardActionResponse(BaseModel):
-    detail: str
+class GenericActionResponse(BaseModel):
+    message: str
+    detail: Optional[str] = None
