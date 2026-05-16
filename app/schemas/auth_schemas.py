@@ -30,3 +30,6 @@ class TokenExchangeResponse(BaseModel):
 class GenericActionResponse(BaseModel):
     message: str
     detail: Optional[str] = None
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

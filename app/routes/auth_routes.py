@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.schemas.auth_schemas import UserCreate, UserLogin, UserRegistrationResponse, TokenExchangeResponse, GenericActionResponse
+from app.schemas.auth_schemas import UserCreate, UserLogin, UserRegistrationResponse, TokenExchangeResponse, GenericActionResponse, RefreshTokenRequest
 from app.dependencies.security import get_password_hash, verify_password, create_access_token, create_refresh_token, decode_token, SECRET_KEY_REFRESH
 from app.dependencies.auth import get_current_user, oauth2_scheme
 from app.config.database import get_user_collection
@@ -64,15 +64,26 @@ async def logout(token: str = Depends(oauth2_scheme)):
     
     return {"message": "Successfully logged out"}
 
+@router.get("/me", response_model=UserRegistrationResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    """Returns the currently authenticated user's profile."""
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "is_active": current_user.is_active,
+        "is_superuser": current_user.is_superuser,
+        "created_at": current_user.created_at
+    }
+
 @router.post("/refresh", response_model=TokenExchangeResponse)
-async def refresh_token(refresh_token: str):
-    payload = decode_token(refresh_token, SECRET_KEY_REFRESH)
+async def refresh_token(body: RefreshTokenRequest):
+    payload = decode_token(body.refresh_token, SECRET_KEY_REFRESH)
     if not payload or payload.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="Invalid refresh token")
     
     email = payload.get("sub")
     access_token = create_access_token(data={"sub": email})
-    # Optional: Rotate refresh token too
+    # Rotate refresh token for enhanced security
     new_refresh_token = create_refresh_token(data={"sub": email})
     
     return {
